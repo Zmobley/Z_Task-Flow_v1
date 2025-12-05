@@ -196,12 +196,27 @@ function ProjectDetailPage() {
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
                       <strong>{task.title}</strong> {' '}
-                      <span className="badge bg-secondary me-2">
+                      <span 
+                        className={`badge me-2 ${
+                      task.status ==='DONE'
+                      ? 'bg-success'
+                      : task.status === 'IN_PROGRESS'
+                      ? 'bg-warning text-dark'
+                      : 'bg-secondary'
+              }`}>
                         {task.status}
                       </span>
-                      <span className="badge bg-info text-dark">
+
+                      <span className={`badge ${
+                      task.priority === 'HIGH'
+                      ? 'bg-danger'
+                      : task.priority ==='LOW'
+                      ? 'bg-secondary'
+                      : 'bg-info text-dark'
+              }`}>
                         {task.priority}
                       </span>
+
                       <br />
                       <small>{task.description}</small>
                       {task.due_date && (
