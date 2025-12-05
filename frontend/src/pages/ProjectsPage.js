@@ -58,7 +58,7 @@ function ProjectsPage() {
   };
 
   return (
-    <div className="container mt-4">
+    <div className="container mt-5">
       <h1 className="mb-4">TaskFlow – Projects</h1>
 
       {error && <div className="alert alert-danger">{error}</div>}

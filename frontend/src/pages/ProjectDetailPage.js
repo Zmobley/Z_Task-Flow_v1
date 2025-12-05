@@ -20,8 +20,8 @@ function ProjectDetailPage() {
   // Fetch project info
   useEffect(() => {
     fetch(`http://localhost:4000/api/projects/${id}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.error) {
           setError(data.error);
         } else {
@@ -29,7 +29,7 @@ function ProjectDetailPage() {
         }
         setLoadingProject(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
         setError('Could not load project.');
         setLoadingProject(false);
@@ -39,12 +39,12 @@ function ProjectDetailPage() {
   // Fetch tasks for this project
   useEffect(() => {
     fetch(`http://localhost:4000/api/tasks/project/${id}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         setTasks(data);
         setLoadingTasks(false);
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err);
         setError('Could not load tasks.');
         setLoadingTasks(false);
@@ -75,10 +75,13 @@ function ProjectDetailPage() {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to create task');
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to create task');
+      }
 
       const newTask = await res.json();
-      setTasks(prev => [newTask, ...prev]);
+      setTasks((prev) => [newTask, ...prev]);
 
       // reset form
       setTitle('');
@@ -88,15 +91,63 @@ function ProjectDetailPage() {
       setDueDate('');
     } catch (err) {
       console.error(err);
-      setError('Could not save task.');
+      setError(err.message || 'Could not save task.');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleMarkDone = async (task) => {
+    setError('');
+    try {
+      const res = await fetch(`http://localhost:4000/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'DONE',
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to update task');
+      }
+
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: 'DONE' } : t))
+      );
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Could not update task.');
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    setError('');
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    try {
+      const res = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Failed to delete task');
+      }
+
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Could not delete task.');
+    }
+  };
+
   return (
-    <div className="container mt-4">
-      <Link to="/" className="btn btn-link mb-3">&larr; Back to Projects</Link>
+    <div className="container mt-5">
+      <Link to="/" className="btn btn-link mb-3">
+        &larr; Back to Projects
+      </Link>
 
       {error && <div className="alert alert-danger">{error}</div>}
 
@@ -191,32 +242,33 @@ function ProjectDetailPage() {
             <p>No tasks yet. Add one above!</p>
           ) : (
             <ul className="list-group">
-              {tasks.map(task => (
+              {tasks.map((task) => (
                 <li className="list-group-item" key={task.id}>
                   <div className="d-flex justify-content-between align-items-center">
                     <div>
-                      <strong>{task.title}</strong> {' '}
-                      <span 
+                      <strong>{task.title}</strong>{' '}
+                      <span
                         className={`badge me-2 ${
-                      task.status ==='DONE'
-                      ? 'bg-success'
-                      : task.status === 'IN_PROGRESS'
-                      ? 'bg-warning text-dark'
-                      : 'bg-secondary'
-              }`}>
+                          task.status === 'DONE'
+                            ? 'bg-success'
+                            : task.status === 'IN_PROGRESS'
+                            ? 'bg-warning text-dark'
+                            : 'bg-secondary'
+                        }`}
+                      >
                         {task.status}
                       </span>
-
-                      <span className={`badge ${
-                      task.priority === 'HIGH'
-                      ? 'bg-danger'
-                      : task.priority ==='LOW'
-                      ? 'bg-secondary'
-                      : 'bg-info text-dark'
-              }`}>
+                      <span
+                        className={`badge ${
+                          task.priority === 'HIGH'
+                            ? 'bg-danger'
+                            : task.priority === 'LOW'
+                            ? 'bg-secondary'
+                            : 'bg-info text-dark'
+                        }`}
+                      >
                         {task.priority}
                       </span>
-
                       <br />
                       <small>{task.description}</small>
                       {task.due_date && (
@@ -224,6 +276,22 @@ function ProjectDetailPage() {
                           <small>Due: {task.due_date}</small>
                         </div>
                       )}
+                    </div>
+                    <div className="btn-group">
+                      {task.status !== 'DONE' && (
+                        <button
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => handleMarkDone(task)}
+                        >
+                          Mark Done
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-sm btn-outline-danger"
+                        onClick={() => handleDeleteTask(task.id)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </li>
