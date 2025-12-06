@@ -1,13 +1,38 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const pool = require('../db');
 
-// GET /api/projects - list all projects
+// For cloud demo: always use in-memory demo data
+const useDemoData = true;
+
+
+// Some demo projects for cloud mode
+const demoProjects = [
+  {
+    id: 1,
+    name: 'IVR Modernization Pilot',
+    description: 'Demo IVR modernization project for TaskFlow.',
+    status: 'ACTIVE',
+    created_at: '2025-01-01',
+  },
+  {
+    id: 2,
+    name: 'MyDSS Self-Service Enhancements',
+    description: 'Demo project for portal self-service improvements.',
+    status: 'PLANNED',
+    created_at: '2025-02-01',
+  },
+];
+
+// GET /api/projects
 router.get('/', async (req, res) => {
+  // If demo mode, return in-memory projects
+  if (useDemoData) {
+    return res.json(demoProjects);
+  }
+
   try {
-    const [rows] = await db.query(
-      'SELECT * FROM projects ORDER BY created_at DESC'
-    );
+    const [rows] = await pool.query('SELECT * FROM projects ORDER BY created_at DESC');
     res.json(rows);
   } catch (err) {
     console.error('Error fetching projects:', err);
@@ -15,39 +40,55 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/projects - create new project
+// POST /api/projects
 router.post('/', async (req, res) => {
   const { name, description } = req.body;
 
-  if (!name || name.trim() === '') {
-    return res.status(400).json({ error: 'Project name is required' });
+  if (!name || !description) {
+    return res.status(400).json({ error: 'Name and description are required.' });
   }
 
-  try {
-    const [result] = await db.query(
-      'INSERT INTO projects (name, description) VALUES (?, ?)',
-      [name, description || null]
-    );
-
+  // Demo mode: push into in-memory array
+  if (useDemoData) {
     const newProject = {
-      id: result.insertId,
+      id: demoProjects.length + 1,
       name,
-      description: description || null
+      description,
+      status: 'ACTIVE',
+      created_at: new Date().toISOString().slice(0, 10),
     };
+    demoProjects.unshift(newProject);
+    return res.status(201).json(newProject);
+  }
 
-    res.status(201).json(newProject);
+  // Real DB mode
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO projects (name, description, status) VALUES (?, ?, ?)',
+      [name, description, 'ACTIVE']
+    );
+    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [result.insertId]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     console.error('Error creating project:', err);
     res.status(500).json({ error: 'Failed to create project' });
   }
 });
 
-// GET /api/projects/:id - get one project
+// GET /api/projects/:id
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
+  if (useDemoData) {
+    const project = demoProjects.find((p) => p.id === Number(id));
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+    return res.json(project);
+  }
+
   try {
-    const [rows] = await db.query('SELECT * FROM projects WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Project not found' });
     }
@@ -58,35 +99,4 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PUT /api/projects/:id - update project
-router.put('/:id', async (req, res) => {
-  const { id } = req.params;
-  const { name, description } = req.body;
-
-  try {
-    await db.query(
-      'UPDATE projects SET name = ?, description = ? WHERE id = ?',
-      [name, description || null, id]
-    );
-    res.json({ message: 'Project updated' });
-  } catch (err) {
-    console.error('Error updating project:', err);
-    res.status(500).json({ error: 'Failed to update project' });
-  }
-});
-
-// DELETE /api/projects/:id - delete project
-router.delete('/:id', async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    await db.query('DELETE FROM projects WHERE id = ?', [id]);
-    res.json({ message: 'Project deleted' });
-  } catch (err) {
-    console.error('Error deleting project:', err);
-    res.status(500).json({ error: 'Failed to delete project' });
-  }
-});
-
-// THIS LINE IS CRITICAL
 module.exports = router;

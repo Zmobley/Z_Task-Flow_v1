@@ -1,13 +1,53 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const pool = require('../db');
 
-// GET /api/tasks/project/:projectId - tasks for a project
+const useDemoData = process.env.USE_DEMO_DATA === 'true';
+
+// Demo tasks in memory
+let demoTasks = [
+  {
+    id: 1,
+    project_id: 1,
+    title: 'Draft IVR call flows',
+    description: 'Create initial call flow diagrams for pilot.',
+    status: 'IN_PROGRESS',
+    priority: 'HIGH',
+    due_date: '2025-01-15',
+  },
+  {
+    id: 2,
+    project_id: 1,
+    title: 'Review Spanish prompts',
+    description: 'Validate Spanish language prompts with SMEs.',
+    status: 'TODO',
+    priority: 'MEDIUM',
+    due_date: '2025-01-20',
+  },
+  {
+    id: 3,
+    project_id: 2,
+    title: 'Identify self-service use cases',
+    description: 'List top 5 MyDSS self-service scenarios.',
+    status: 'TODO',
+    priority: 'LOW',
+    due_date: '2025-02-10',
+  },
+];
+
+// GET /api/tasks/project/:projectId
 router.get('/project/:projectId', async (req, res) => {
   const { projectId } = req.params;
 
+  if (useDemoData) {
+    const tasksForProject = demoTasks.filter(
+      (t) => t.project_id === Number(projectId)
+    );
+    return res.json(tasksForProject);
+  }
+
   try {
-    const [rows] = await db.query(
+    const [rows] = await pool.query(
       'SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC',
       [projectId]
     );
@@ -18,93 +58,96 @@ router.get('/project/:projectId', async (req, res) => {
   }
 });
 
-// POST /api/tasks/project/:projectId - create a task
+// POST /api/tasks/project/:projectId
 router.post('/project/:projectId', async (req, res) => {
   const { projectId } = req.params;
-  const { title, description, status, priority, due_date } = req.body;
+  const { title, description, priority, status, due_date } = req.body;
 
-  if (!title || title.trim() === '') {
-    return res.status(400).json({ error: 'Task title is required' });
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Title and description are required.' });
+  }
+
+  if (useDemoData) {
+    const newTask = {
+      id: demoTasks.length + 1,
+      project_id: Number(projectId),
+      title,
+      description,
+      status: status || 'TODO',
+      priority: priority || 'MEDIUM',
+      due_date: due_date || null,
+    };
+    demoTasks.unshift(newTask);
+    return res.status(201).json(newTask);
   }
 
   try {
-    const [result] = await db.query(
-      `INSERT INTO tasks (project_id, title, description, status, priority, due_date)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+    const [result] = await pool.query(
+      'INSERT INTO tasks (project_id, title, description, status, priority, due_date) VALUES (?, ?, ?, ?, ?, ?)',
       [
         projectId,
         title,
-        description || null,
+        description,
         status || 'TODO',
         priority || 'MEDIUM',
-        due_date || null
+        due_date || null,
       ]
     );
-
-    const newTask = {
-      id: result.insertId,
-      project_id: Number(projectId),
-      title,
-      description: description || null,
-      status: status || 'TODO',
-      priority: priority || 'MEDIUM',
-      due_date: due_date || null
-    };
-
-    res.status(201).json(newTask);
+    const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ?', [
+      result.insertId,
+    ]);
+    res.status(201).json(rows[0]);
   } catch (err) {
     console.error('Error creating task:', err);
     res.status(500).json({ error: 'Failed to create task' });
   }
 });
 
-// PUT /api/tasks/:id - update task (partial-safe)
+// PUT /api/tasks/:id (update status etc.)
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, description, status, priority, due_date } = req.body;
+  const { status } = req.body;
+
+  if (useDemoData) {
+    const idx = demoTasks.findIndex((t) => t.id === Number(id));
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    demoTasks[idx] = { ...demoTasks[idx], status: status || demoTasks[idx].status };
+    return res.json(demoTasks[idx]);
+  }
 
   try {
-    // Get current task so we can safely merge updates
-    const [rows] = await db.query('SELECT * FROM tasks WHERE id = ?', [id]);
+    await pool.query('UPDATE tasks SET status = ? WHERE id = ?', [status, id]);
+    const [rows] = await pool.query('SELECT * FROM tasks WHERE id = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Task not found' });
     }
-
-    const existing = rows[0];
-
-    const updatedTitle = title ?? existing.title;
-    const updatedDescription = description ?? existing.description;
-    const updatedStatus = status ?? existing.status;
-    const updatedPriority = priority ?? existing.priority;
-    const updatedDueDate = typeof due_date !== 'undefined' ? due_date : existing.due_date;
-
-    await db.query(
-      `UPDATE tasks
-       SET title = ?, description = ?, status = ?, priority = ?, due_date = ?
-       WHERE id = ?`,
-      [
-        updatedTitle,
-        updatedDescription,
-        updatedStatus,
-        updatedPriority,
-        updatedDueDate,
-        id
-      ]
-    );
-
-    res.json({ message: 'Task updated' });
+    res.json(rows[0]);
   } catch (err) {
     console.error('Error updating task:', err);
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
 
-// DELETE /api/tasks/:id - delete task
+// DELETE /api/tasks/:id
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
 
+  if (useDemoData) {
+    const before = demoTasks.length;
+    demoTasks = demoTasks.filter((t) => t.id !== Number(id));
+    if (demoTasks.length === before) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    return res.json({ message: 'Task deleted' });
+  }
+
   try {
-    await db.query('DELETE FROM tasks WHERE id = ?', [id]);
+    const [result] = await pool.query('DELETE FROM tasks WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
     res.json({ message: 'Task deleted' });
   } catch (err) {
     console.error('Error deleting task:', err);
