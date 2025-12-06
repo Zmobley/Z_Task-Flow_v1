@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -11,19 +12,19 @@ function ProjectsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetch('http://localhost:4000/api/projects')
-      .then(res => res.json())
-      .then(data => {
-        setProjects(data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching projects:', err);
-        setError('Could not load projects.');
-        setLoading(false);
-      });
-  }, []);
+ useEffect(() => {
+  fetch(`${API_BASE_URL}/api/projects`)
+    .then(res => res.json())
+    .then(data => {
+      setProjects(data);
+      setLoading(false);
+    })
+    .catch(err => {
+      console.error('Error fetching projects:', err);
+      setError('Could not load projects.');
+      setLoading(false);
+    });
+}, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,7 +38,7 @@ function ProjectsPage() {
     setSaving(true);
 
     try {
-      const res = await fetch('http://localhost:4000/api/projects', {
+      const res = await fetch(`${API_BASE_URL}/api/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),

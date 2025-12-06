@@ -1,0 +1,9 @@
+const isProd = process.env.NODE_ENV === 'production';
+
+// For now keep localhost for both.
+// Later, when we have a cloud backend URL, we will replace CLOUD_API_BASE.
+const CLOUD_API_BASE = 'https://z-task-flow-v1.onrender.com/;
+
+export const API_BASE_URL = isProd
+  ? CLOUD_API_BASE
+  : 'https://z-task-flow-v1.onrender.com/;

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
@@ -19,7 +20,7 @@ function ProjectDetailPage() {
 
   // Fetch project info
   useEffect(() => {
-    fetch(`http://localhost:4000/api/projects/${id}`)
+    fetch(`${API_BASE_URL}/api/projects/${id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.error) {
@@ -38,18 +39,31 @@ function ProjectDetailPage() {
 
   // Fetch tasks for this project
   useEffect(() => {
-    fetch(`http://localhost:4000/api/tasks/project/${id}`)
+    fetch(`${API_BASE_URL}/api/tasks/project/${id}`)
       .then((res) => res.json())
       .then((data) => {
-        setTasks(data);
+        console.log('Tasks API response:', data);
+
+        if (Array.isArray(data)) {
+          setTasks(data);
+        } else if (data && data.error) {
+          setError(data.error);
+          setTasks([]);
+        } else {
+          setError('Unexpected response format when loading tasks.');
+          setTasks([]);
+        }
+
         setLoadingTasks(false);
       })
       .catch((err) => {
-        console.error(err);
+        console.error('Error fetching tasks:', err);
         setError('Could not load tasks.');
+        setTasks([]);
         setLoadingTasks(false);
       });
   }, [id]);
+
 
   const handleAddTask = async (e) => {
     e.preventDefault();
@@ -63,7 +77,7 @@ function ProjectDetailPage() {
     setSaving(true);
 
     try {
-      const res = await fetch(`http://localhost:4000/api/tasks/project/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/tasks/project/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,7 +114,7 @@ function ProjectDetailPage() {
   const handleMarkDone = async (task) => {
     setError('');
     try {
-      const res = await fetch(`http://localhost:4000/api/tasks/${task.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,7 +141,7 @@ function ProjectDetailPage() {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
 
     try {
-      const res = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
         method: 'DELETE',
       });
 
@@ -234,10 +248,11 @@ function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Tasks list */}
-          <h3>Tasks</h3>
+        <h3>Tasks</h3>
           {loadingTasks ? (
             <p>Loading tasks...</p>
+          ) : !Array.isArray(tasks) ? (
+            <p>Unexpected tasks data. Please try refreshing.</p>
           ) : tasks.length === 0 ? (
             <p>No tasks yet. Add one above!</p>
           ) : (
