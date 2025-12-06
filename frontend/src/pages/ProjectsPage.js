@@ -12,16 +12,28 @@ function ProjectsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
- useEffect(() => {
+useEffect(() => {
   fetch(`${API_BASE_URL}/api/projects`)
-    .then(res => res.json())
-    .then(data => {
-      setProjects(data);
+    .then((res) => res.json())
+    .then((data) => {
+      console.log('Projects API response:', data);
+
+      if (Array.isArray(data)) {
+        setProjects(data);
+      } else if (data && data.error) {
+        setError(data.error);
+        setProjects([]);
+      } else {
+        setError('Unexpected response format when loading projects.');
+        setProjects([]);
+      }
+
       setLoading(false);
     })
-    .catch(err => {
+    .catch((err) => {
       console.error('Error fetching projects:', err);
       setError('Could not load projects.');
+      setProjects([]);
       setLoading(false);
     });
 }, []);
@@ -106,10 +118,20 @@ function ProjectsPage() {
       <h2 className="mb-3">Existing Projects</h2>
 
       {loading ? (
-        <p>Loading projects...</p>
-      ) : projects.length === 0 ? (
-        <p>No projects available yet. Add one above!</p>
-      ) : (
+  <p>Loading projects...</p>
+) : !Array.isArray(projects) ? (
+  <p>Unexpected project data. Please try refreshing.</p>
+) : projects.length === 0 ? (
+  <p>No projects yet. Add one above!</p>
+) : (
+   <div className="row">
+    {projects.map((project) => (
+      <div className="col-md-4 mb-3" key={project.id}>
+        {/* your existing project card code here */}
+      </div>
+    ))}
+  </div>
+)}
         <ul className="list-group">
           {projects.map(project => (
             <li className="list-group-item d-flex justify-content-between align-items-center" key={project.id}>
@@ -127,7 +149,7 @@ function ProjectsPage() {
             </li>
           ))}
         </ul>
-      )}
+        
     </div>
   );
 }
