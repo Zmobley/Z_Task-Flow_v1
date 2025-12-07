@@ -8,7 +8,7 @@ TaskFlow is a web application that allows users to create projects, add tasks, a
 - **Backend:** Node.js + Express
 - **Database:** MySQL
 - **Source Control:** Git + GitHub
-- **Deployment:** Azure (via GitHub Actions)
+- **Deployment:** AWS S3 Static Web  (via GitHub Actions)
 
 ## Folder Structure
 
